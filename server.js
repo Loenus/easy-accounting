@@ -3,6 +3,8 @@ const multer = require('multer');
 const xlsx = require('xlsx');
 const path = require('path');
 const fs = require('fs');
+const Excel = require('exceljs');
+const workbook = new Excel.Workbook();
 
 require("dotenv").config();
 const app = express();
@@ -25,38 +27,42 @@ app.get('/', (req, res) => {
     res.render('index', { title: 'Home Page' });
 });
 
-app.post('/upload', upload.single('file'), (req, res) => {
+app.post('/upload', upload.single('file'), async (req, res) => {
     try {
+        await workbook.xlsx.readFile('test.xlsx');
+        const worksheet = workbook.getWorksheet(1);
+
+        // Carica il file caricato
         console.log('File caricato:', req.file);
         const filePath = req.file.path;
+        const workbook2 = new Excel.Workbook();
+        await workbook2.xlsx.readFile(filePath);
+        const worksheet2 = workbook2.getWorksheet(1);
 
-        const workbook = xlsx.readFile(filePath);
-        const sheetName = workbook.SheetNames[0];
-        const newdata = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
+        // Mappare i dati e aggiungerli
+        worksheet2.eachRow({ includeEmpty: false }, (row, rowNumber) => { //includeEmpty ignora le righe completamente vuote
+            if (rowNumber > 19) {
+                const cell1 = row.getCell(1).value || 'Valore predefinito per A';
+                const cell3 = row.getCell(8).value || null;
+                const newRow = worksheet.addRow([
+                    cell1, // colonna A del file statico
+                    'A', // colonna B
+                    'ss','ss',
+                    cell3
+                ]);
+                newRow.commit();
+            }
+        });
 
-        const testFilePath = './test.xlsx';
-        let testWorkbook;
-        if (fs.existsSync(testFilePath)) {
-          testWorkbook = xlsx.readFile(testFilePath);
-        } else {
-          testWorkbook = xlsx.utils.book_new();
-        }
-        const testSheetName = testWorkbook.SheetNames[0] || 'Sheet1';
-        const testSheet = testWorkbook.Sheets[testSheetName] || xlsx.utils.aoa_to_sheet([[]]);
-        const testData = xlsx.utils.sheet_to_json(testSheet, { header: 1 });
+        // Scrivi le modifiche 
+        console.log(`ho finito di leggere: ${req.file.path}`)
+        await workbook.xlsx.writeFile('Template2.xlsx');
+        console.log('File test.xlsx aggiornato con successo!');
 
-        newdata.forEach(row => {
-            testData.push(Object.values(row));
-        })
-        const updatedSheet = xlsx.utils.aoa_to_sheet(testData);
-        testWorkbook.Sheets[testSheetName] = updatedSheet;
-        xlsx.writeFile(testWorkbook, testFilePath);
-
-        console.log('Dati estratti:', newdata);
         res.send(`File elaborato con successo: ${req.file.filename}`);
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Errore durante il caricamento del file.');
+    } catch (error) {
+        console.error('Errore durante l’elaborazione:', error);
+        res.status(500).send('Errore durante l’elaborazione del file.');
     }
 });
 
