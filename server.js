@@ -10,6 +10,7 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(express.static(path.join(__dirname, 'public')));
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -24,12 +25,13 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 app.get('/', (req, res) => {
-    res.render('index', { title: 'Home Page' });
+    res.render('index', { message: null });
 });
 
 app.post('/upload', upload.single('file'), async (req, res) => {
     try {
-        await workbook.xlsx.readFile('test.xlsx');
+        const selectedService = req.body.service;
+        await workbook.xlsx.readFile('Template2.xlsx');
         const worksheet = workbook.getWorksheet(1);
 
         // Carica il file caricato
@@ -41,16 +43,20 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 
         // Mappare i dati e aggiungerli
         worksheet2.eachRow({ includeEmpty: false }, (row, rowNumber) => { //includeEmpty ignora le righe completamente vuote
-            if (rowNumber > 19) {
-                const cell1 = row.getCell(1).value || 'Valore predefinito per A';
-                const cell3 = row.getCell(8).value || null;
-                const newRow = worksheet.addRow([
-                    cell1, // colonna A del file statico
-                    'A', // colonna B
-                    'ss','ss',
-                    cell3
-                ]);
-                newRow.commit();
+            if (selectedService == "intesa") {
+                if (rowNumber > 19) {
+                    const cell1 = row.getCell(1).value || 'Valore predefinito per A';
+                    const cell3 = row.getCell(8).value || null;
+                    const newRow = worksheet.addRow([
+                        cell1, // colonna A del file statico
+                        'A', // colonna B
+                        'ss','ss',
+                        cell3
+                    ]);
+                    newRow.commit();
+                }
+            } else if (selectedService == "paypal") {
+                console.log('TODO elaborazione paypal')
             }
         });
 
@@ -59,10 +65,16 @@ app.post('/upload', upload.single('file'), async (req, res) => {
         await workbook.xlsx.writeFile('Template2.xlsx');
         console.log('File test.xlsx aggiornato con successo!');
 
-        res.send(`File elaborato con successo: ${req.file.filename}`);
+        res.json({
+            type: 'success',
+            text: `File elaborato con successo: ${req.file.filename}`
+        });
     } catch (error) {
         console.error('Errore durante l’elaborazione:', error);
-        res.status(500).send('Errore durante l’elaborazione del file.');
+        res.status(500).json({
+            type: 'error',
+            text: 'CARICAMENTO FALLITO, erorre generico durante l\'elaborazione del file'
+        })
     }
 });
 
